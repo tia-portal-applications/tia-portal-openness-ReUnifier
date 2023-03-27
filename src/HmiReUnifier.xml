@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Objects>
+  <HmiTags>
+    <DataType>Bool,Byte,DateTime,DInt,DWord,Int,LInt,LReal,LTime,LWord,Real,SInt,UDInt,UInt,ULInt,USInt,WChar,Word,WString,Array [0..10] of Int</DataType>
+  </HmiTags>
+  <Screens>
+    <ColorFavorites>White,#D924BE,#C0E0FF,#C0FFFF,#C0FFC0,#FFFFC0,#FFC0C0,#FFC0C0</ColorFavorites>
+  </Screens>
+</Objects>
