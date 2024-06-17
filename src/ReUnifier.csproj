@@ -35,10 +35,10 @@
   <ItemGroup>
     <Reference Include="PresentationFramework" />
     <Reference Include="Siemens.Engineering">
-      <HintPath>C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18\Siemens.Engineering.dll</HintPath>
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.dll</HintPath>
     </Reference>
     <Reference Include="Siemens.Engineering.Hmi">
-      <HintPath>C:\Program Files\Siemens\Automation\Portal V18\PublicAPI\V18\Siemens.Engineering.Hmi.dll</HintPath>
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V19\PublicAPI\V19\Siemens.Engineering.Hmi.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

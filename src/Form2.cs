@@ -21,6 +21,7 @@ using Siemens.Engineering.HmiUnified.UI.Enum;
 using Siemens.Engineering.HmiUnified.UI.Screens;
 using Siemens.Engineering.Hmi.Tag;
 using Siemens.Engineering.HmiUnified.HmiTags;
+using Siemens.Engineering.HW;
 
 namespace ReUnifier
 {
@@ -71,7 +72,7 @@ namespace ReUnifier
             get => this.OptionName.Text;
             set => OptionName.Text = value;
         }
-        public void GetXmlInformation(string xmlFilePath)
+        public void GetXmlInformation(string xmlFilePath , string nodePath)
         {
             try
             {
@@ -81,7 +82,7 @@ namespace ReUnifier
                 myXmlDoc.Load(xmlFilePath);
                 //Get the first node with matching name (selectsinglenode): the root node of this XML file
                 //XmlNode rootNode = myXmlDoc.SelectSingleNode("HmiTags");
-                XmlNode node = myXmlDoc.SelectSingleNode("//Objects/HmiTags/DataType");
+                XmlNode node = myXmlDoc.SelectSingleNode(nodePath   );
                 if (node != null)
                 {
                     String xmlDate = node.InnerText;
@@ -225,7 +226,7 @@ namespace ReUnifier
             PropertyEventHandler propertyEvent = hmiCircle.PropertyEventHandlers.Create("ToolTipText",PropertyEventType.Change);
 
         }
-        private void StatementsProperty_TextUpdate(object sender, EventArgs e)
+        private void StatementsProperty_TextUpdate(object sender, EventArgs e)//When the input box text changes, automatically match the names of attributes that may be suitable and add them to the drop-down list for selection.
         {
             StatementsValue.Text = "";
             //Clear Combobox
@@ -280,6 +281,14 @@ namespace ReUnifier
                         ListConditionProperty.Add(p.Name);
                     }
                 }
+            }
+            if(OptionName.Text == @"HmiLoggingTags")
+            {
+                if(TxtStatusBoxSelect == "INSERT")
+                {
+                    ListConditionProperty.Clear();
+                }
+                ListConditionProperty.Add("Process tag");
             }
             ConditionProperty.Items.Clear();
             this.ConditionProperty.Items.AddRange(ListConditionProperty.ToArray());
@@ -452,26 +461,57 @@ namespace ReUnifier
         {
             int resultBool = 0;
             Program.SetStatements.Clear();
+            /*
             foreach (string item in StatementsBox.Items)
             {
                 string[] StatementsBoxArr = Regex.Split(item, "&&=&&", RegexOptions.IgnoreCase);
                 Program.SetStatements.Add(StatementsBoxArr[0].Trim(), StatementsBoxArr[1].Trim());
             }
-            if (type == "executed" && comboBox1.Text == @"INSERT" && (Program.SetStatements.ContainsKey("Name") != true))
+            */
+            if(listBoxCheck.Text.Contains(" SET "))
             {
+                string statementList = "" ;
+                int indexSet = listBoxCheck.Text.IndexOf(" SET ", StringComparison.Ordinal) + 5;
+                int strLength = listBoxCheck.Text.Length;
+                if (listBoxCheck.Text.Contains(" WHERE "))
+                {
+                    int indexWhere = listBoxCheck.Text.IndexOf(" WHERE ", StringComparison.Ordinal);
+                    statementList = listBoxCheck.Text.Substring(indexSet, indexWhere - indexSet);
+                }
+                else
+                {
+                    statementList = listBoxCheck.Text.Substring(indexSet);
+                }
+                string[] statementListArr = statementList.Split(new[] { "&$&" }, StringSplitOptions.None);
+                foreach (string item in statementListArr)
+                {
+                    string[] StatementsBoxArr = item.Split('=');
+                    Program.SetStatements.Add(StatementsBoxArr[0].Trim(), StatementsBoxArr[1].Trim());
+                }
+            }
+            if (type == "executed" && comboBox1.Text == @"INSERT" && (Program.SetStatements.ContainsKey("Name") != true))
+            {              
                 MessageBox.Show(@"Missing name row in set list!");
                 return 1;
             }
-            Program.ScreenName = PicNameStr == "*" ? ".*" : PicNameStr;
-            Program.WhereConditionsStr = "";
-            if (checklistkeep.Text.Contains(" WHERE "))
+            if(Program.ScreenName=="")
             {
-                int indexWhere = checklistkeep.Text.IndexOf(" WHERE ", StringComparison.Ordinal);
-                Program.WhereConditionsStr = checklistkeep.Text.Substring((indexWhere + 7));
+                Program.ScreenName = PicName.Text == "*" ? ".*" : PicName.Text;
+            }
+            else
+            {
+                Program.ScreenName = Program.ScreenName == "*" ? ".*" : Program.ScreenName;
+            }
+            
+            Program.WhereConditionsStr = "";
+            if (listBoxCheck.Text.Contains(" WHERE "))
+            {
+                int indexWhere = listBoxCheck.Text.IndexOf(" WHERE ", StringComparison.Ordinal);
+                Program.WhereConditionsStr = listBoxCheck.Text.Substring((indexWhere + 7));
             }
 
             if (type == "executed")
-            {
+            {            
                 LogAndXmlOP.LogOut("Log", "Execute : " + listBoxCheck.Text + " \n", 0);
                 Program.StrShow = Program.StrShow + "Execute : " + listBoxCheck.Text + " \n";
             }
@@ -482,11 +522,15 @@ namespace ReUnifier
                 {
                     throw new Exception("No WinCC Unified software found. Please add a WinCC Unified device and run this app again!");
                 }
-                else if (comboBox1.Text == @"INSERT" && OptionName.Text.Contains("Screen") == false)
+                else if (Program.OptionStr.StartsWith(@"INSERT") && Program.ScreenName.Contains("Screen") == false)
                 {
                     _insertNewItem.InsertTags(type);
                 }
-                else if (Program.ScreenName == @"HmiLoggingTags" || Program.ScreenName == @"HmiTags")
+                else if (Program.ScreenName == @"HmiLoggingTags")
+                {
+                    conditionNum = _insertNewItem.HandleHmiLoggingTags(type);
+                }
+                else if (Program.ScreenName == @"HmiTags")
                 {
                     conditionNum = _insertNewItem.HandleHmiTags(type);
                 }
@@ -496,7 +540,10 @@ namespace ReUnifier
                 }
                 else if (!string.IsNullOrWhiteSpace(Program.ScreenName))
                 {
-                    Program.ScreenName = PicName.Text;
+                    if (Program.ScreenName == "ScreenItems")
+                    {
+                        Program.ScreenName = Program.OptionStr.Split(new[] { "&$&" }, StringSplitOptions.None)[2];
+                    }
                     conditionNum = _insertNewItem.UpdateScreen(type);
                 }
                 if (type == "executed")
@@ -555,7 +602,6 @@ namespace ReUnifier
                         return;
                     }
                 }
-
                 StatementsBox.Items.Add(statementsPropertyStr + " &&=&& " + statementsValueStr);
             }
             ScriptStr.Text = "";
@@ -581,7 +627,6 @@ namespace ReUnifier
                 StatementsBox.Items.Clear();
             }
         }
-        
         private void StatementsProperty_SelectedIndexChanged(object sender, EventArgs e)
         {
             StatementsValue.Text = "";
@@ -596,15 +641,19 @@ namespace ReUnifier
             Program.DynamizationType = "";
             if (StatementsProperty.Text == @"DataType")
             {
-                GetXmlInformation(XmlPath);
+                GetXmlInformation(XmlPath, "//Objects/HmiTags/DataType");
+            }
+            else if (StatementsProperty.Text == @"LoggingMode")
+            {
+                GetXmlInformation(XmlPath, "//Objects/LoggingTags/LoggingMode");
             }
             else if (StatementsProperty.Text.Contains("Color"))
             {
                 panel4.Visible = true;
-                if(StatusBoxText == "ScreenItems" || StatusBoxText == "ScreenProperties")
+                if (StatusBoxText == "ScreenItems" || StatusBoxText == "ScreenProperties")
                 {
                     this.StatementsValue.Items.Add("Dynamization");
-                }                
+                }
             }
             else if (StatementsProperty.Text.Contains("Font"))
             {
@@ -613,29 +662,30 @@ namespace ReUnifier
                 this.Font_Size.Items.Add("12");
                 this.Font_Size.Items.Add("Dynamization");
             }
-            else if(StatementsProperty.Text == "Events")
+            else if (StatementsProperty.Text == "Events")
             {
                 Program.EventList.Clear();
                 if (StatusBoxText == "ScreenItems")
                 {
                     foreach (var screenItem in Program.ItemList)
-                    {                        
+                    {
                         IEngineeringObject itemConcreto = screenItem;
                         foreach (IEngineeringObject eveHandItem in itemConcreto.GetComposition("EventHandlers") as IEngineeringComposition)
                         {
-                            
-                           // IEngineeringObject script = eveHandItem.GetAttribute("Script") as IEngineeringObject;
+
+                            // IEngineeringObject script = eveHandItem.GetAttribute("Script") as IEngineeringObject;
                             string eveType = eveHandItem.GetAttribute("EventType").ToString();
                             if (Program.EventList.Contains(eveType) == false)
                             {
                                 Program.EventList.Add(eveType);
-                            }                         
+                            }
                         }
                     }
                 }
                 if (StatusBoxText == "ScreenProperties")
                 {
-                    foreach (var screen in Program.GetScreens())
+                    // string screenNameStr = PicName.Text.Trim();
+                    foreach (var screen in Program.conditionScreenList)
                     {
                         foreach (HmiScreenEventHandler eveHandler in screen.EventHandlers)
                         {
@@ -646,17 +696,21 @@ namespace ReUnifier
                                 Program.EventList.Add(eveType);
                             }
                         }
-
                     }
                 }
                 Event eventForm = new Event();
                 eventForm.TaskEvent += new EventTaskDelegate(StatementValueStr);
                 eventForm.ShowDialog();
-            }
+            }           
             else
             {
                 if (StatusBoxText == "ScreenItems")
                 {
+                    if (StatementsProperty.Text == "HiddenInput" || StatementsProperty.Text == "AcceptOnDeactivated")
+                    {
+                        this.StatementsValue.Items.Add("True");
+                        this.StatementsValue.Items.Add("False");
+                    }
                     Regex rx = new Regex(PicName.Text);
                     foreach (var screen in Program.GetScreens())
                     {
@@ -668,8 +722,10 @@ namespace ReUnifier
                         {
                             if (ContainProperty(screenItem, StatementsProperty.Text))//Read the value of the selected attribute from all eligible items of the specified screen
                             {
-                                var valuesStr = screenItem.GetType().GetProperty(StatementsProperty.Text)?.GetValue(screenItem, null).ToString();
-                                if (this.StatementsValue.Items.Contains(valuesStr) == false)
+                                var valuesStr="";
+                                
+                                valuesStr = screenItem.GetType().GetProperty(StatementsProperty.Text)?.GetValue(screenItem, null).ToString();
+                                if (this.StatementsValue.Items.Contains(valuesStr) == false && valuesStr != "")
                                 {
                                     if (valuesStr != null) this.StatementsValue.Items.Add(valuesStr);
                                 }
@@ -688,7 +744,6 @@ namespace ReUnifier
                 }
             }
         }
-
         private void StatementsValue_TextUpdate(object sender, EventArgs e)
         {
             //Clear Combobox
@@ -818,14 +873,26 @@ namespace ReUnifier
             {
                 foreach (var tag in Program.HmiSoftware.Tags)
                 {
-                    foreach (var logTag in tag.LoggingTags)
+                    if(propertyName == "Process tag")
                     {
-                        valuesStr = logTag.GetType().GetProperty(propertyName)?.GetValue(logTag, null).ToString();
+                        valuesStr = tag.Name.ToString();
                         if (propertyNameList.Contains(valuesStr) == false)
                         {
                             propertyNameList.Add(valuesStr);
                         }
                     }
+                    else
+                    {
+                        foreach (var logTag in tag.LoggingTags)
+                        {
+                            valuesStr = logTag.GetType().GetProperty(propertyName)?.GetValue(logTag, null).ToString();
+                            if (propertyNameList.Contains(valuesStr) == false)
+                            {
+                                propertyNameList.Add(valuesStr);
+                            }
+                        }
+                    }
+                    
                 }
             }
             return propertyNameList;
@@ -845,12 +912,34 @@ namespace ReUnifier
             if (tiaPortal == null) throw new ArgumentNullException(nameof(tiaPortal));
             tiaPortal = tiaPortalProcess.Attach();
             TiaPortalProject = tiaPortal.Projects[0];
+            var allDevice = GetDevice(TiaPortalProject);
+
             return
-            from device in TiaPortalProject.Devices
-            from deviceItem in device.DeviceItems
+          //  from device in TiaPortalProject.Devices
+            from device in allDevice
+            from deviceItem in device.DeviceItems       
             let softwareContainer = deviceItem.GetService<Siemens.Engineering.HW.Features.SoftwareContainer>()
             where softwareContainer?.Software is HmiSoftware
             select softwareContainer.Software as HmiSoftware;
+        }
+
+        public IEnumerable<Device> GetDevice(Project project)
+        {
+            var allDevice = project.Devices.ToList();
+            if(project.DeviceGroups.Count>0)
+            {
+                foreach (var devicegroup in project.DeviceGroups)
+                {
+                    if(devicegroup.Devices.Count>0)
+                    {
+                        foreach (var device in devicegroup.Devices)
+                        {
+                            allDevice.Add(device);
+                        }
+                    }
+                }
+            }
+            return allDevice;
         }
 
         private void StatementsBox_MouseClick(object sender, MouseEventArgs e)
@@ -999,12 +1088,12 @@ namespace ReUnifier
                 }
                 else if (bName == "pictureBox2" || (bName == "buttonExecute" && label2.Font.Bold) || (bName == "ButtonPrevious" && label10.Font.Bold))
                 {                   
-                    if (checklistkeep.Text.Trim().StartsWith("INSERT") && (StatusBoxText == "HmiTags" || StatusBoxText == "HmiDiscreteAlarmTags" || StatusBoxText == "HmiAnalogAlarmTags") && (bName == "buttonExecute" && label2.Font.Bold))
+                    if (checklistkeep.Text.Trim().Contains("INSERT") && (StatusBoxText == "HmiTags" || StatusBoxText == "HmiDiscreteAlarmTags" || StatusBoxText == "HmiAnalogAlarmTags") && (bName == "buttonExecute" && label2.Font.Bold))
                     {
                         Step_Click(pictureBox3, e);
                         return;
                     }
-                    else if (checklistkeep.Text.Trim().StartsWith("INSERT") && (StatusBoxText == "HmiTags" || StatusBoxText == "HmiDiscreteAlarmTags" || StatusBoxText == "HmiAnalogAlarmTags") && (bName == "ButtonPrevious" && label10.Font.Bold))
+                    else if (checklistkeep.Text.Trim().Contains("INSERT") && (StatusBoxText == "HmiTags" || StatusBoxText == "HmiDiscreteAlarmTags" || StatusBoxText == "HmiAnalogAlarmTags") && (bName == "ButtonPrevious" && label10.Font.Bold))
                     {
                         Step_Click(pictureBox1, e);
                         return;
@@ -1058,14 +1147,18 @@ namespace ReUnifier
                     buttonExecute.Enabled = false;
                     label11.Font = new Font(label11.Font, label11.Font.Style | FontStyle.Bold);
                     pictureBox4.Image = ReUnifier.Properties.Resources.inProgress;
+                    /*
                     if (Program.ProState > 3)
                     {
                         buttonExecute.Enabled = true;
                     }
+                    */
+                    buttonExecute.Enabled = true;
                 }
                 else if (bName == "buttonExecute" && label11.Font.Bold)
                 {
                     FontStyleReset();
+                    DeviceSelect_SelectedIndexChanged(sender, e);
                     if (Execute("executed") == 1)
                     {
                         return;
@@ -1123,7 +1216,7 @@ namespace ReUnifier
                         }
                     }
 
-                    Program.OperationStr = unitStr;
+                    Program.OperationStr = "DEVICE " + deviceSelect.Text + "&$&" + unitStr;
                     checklistkeep.Text = Program.OperationStr;
                     if (Program.StatementStr.Length > 0)
                     {
@@ -1153,7 +1246,7 @@ namespace ReUnifier
                         }
                         else
                         {
-                            unitStr = unitStr + "," + item.Replace("&&=&&", " = ");
+                            unitStr = unitStr + "&$&" + item.Replace("&&=&&", " = ");
                         }
                     }
                     Program.StatementStr = unitStr;
@@ -1303,9 +1396,25 @@ namespace ReUnifier
                 foreach (PropertyInfo p in Properties)
                 {
                     // ConditionProperty.Items.Add(p.Name);
-                    if (p.Name == "Font" && ListStatementsProperty.Contains(p.Name) ==false)
+                    if (p.Name == "Font" && ListStatementsProperty.Contains(p.Name) == false)
                     {
                         ListStatementsProperty.Add("Font");
+                    }
+                    else if(p.DeclaringType.Name=="HmiTextBox" && ListStatementsProperty.Contains("Text") == false)
+                    {
+                        ListStatementsProperty.Add("Text");
+                    }
+                    else if(p.DeclaringType.Name == "HmiIOField")
+                    {
+                        if(ListStatementsProperty.Contains("HiddenInput")== false)
+                        {
+                            ListStatementsProperty.Add("HiddenInput");
+                        }
+                        if(ListStatementsProperty.Contains("AcceptOnDeactivated") == false)
+                        {
+                            ListStatementsProperty.Add("AcceptOnDeactivated");
+                        }
+                        
                     }
                     else if (p.CanWrite && ListStatementsProperty.Contains(p.Name) == false)
                     {
@@ -1336,7 +1445,7 @@ namespace ReUnifier
                         LogAndXmlOP.LogOut($"Log", $"Project select : {projectPath} \n", 0);
                         this.deviceSelect.Text = Program.HmiSoftware?.Name;
                         HmiSoftwareList = GetHmiSoftware(ref MyTiaPortal, tiaPortalProcess).ToArray();
-
+                        
                         if (HmiSoftwareList.Count > 0)
                         {
                             foreach (HmiSoftware hmiSoftwareSelect in HmiSoftwareList)
@@ -1922,9 +2031,24 @@ namespace ReUnifier
 
         private void DeviceSelect_SelectedIndexChanged(object sender, EventArgs e)
         {
+            Control button = (Control)sender;
+            string bName = button.Name;
             var deviceSel = deviceSelect.Text;
-            ParaReset();
-            deviceSelect.Text = deviceSel;
+            Program.ScreenName = "";
+            if (bName== "buttonExecute" && listBoxCheck.Text.Length>15)
+            {
+                int deviceStrLength = listBoxCheck.Text.IndexOf("&$&") -7;
+                deviceSel = listBoxCheck.Text.Substring(7, deviceStrLength).Trim();
+                int typeStrLength = listBoxCheck.Text.IndexOf("SET") - listBoxCheck.Text.IndexOf("&$&") - 3;
+                Program.OptionStr = listBoxCheck.Text.Substring(listBoxCheck.Text.IndexOf("&$&") + 3, typeStrLength).Trim();
+                Program.ScreenName = Program.OptionStr.Split(new[] { "&$&" }, StringSplitOptions.None)[1].Trim();
+                
+            }
+            else
+            {
+                ParaReset();
+            }           
+            //deviceSelect.Text = deviceSel;
             if (HmiSoftwareList.Count > 0)
             {
                 foreach (HmiSoftware hmiSoftwareSelect in HmiSoftwareList)
@@ -1964,52 +2088,143 @@ namespace ReUnifier
         private void StatementsValue_SelectedIndexChanged(object sender, EventArgs e)
         {
             if(StatementsValue.Text== "Dynamization")
-            {              
-                foreach (var screenItem in Program.ItemList)
+            {
+                colorSelector1.Visible = false;
+                panel4.Visible = false;
+                if (Program.OptionStr.EndsWith("ScreenProperties"))
                 {
-                    if (screenItem.Dynamizations.Count > 0)
+                    foreach (var screen in Program.conditionScreenList)
                     {
-                        foreach (var itemDynamization in screenItem.Dynamizations)
+                        if(screen.Dynamizations.Count>0)
                         {
-                            Regex PropertyName = new Regex(itemDynamization.PropertyName.ToString());
-                            if (!PropertyName.Match(StatementsProperty.Text).Success)
+                            foreach (var itemDynamization in screen.Dynamizations)
                             {
-                                continue;
-                            }
-                            if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Script)
-                            {
-                                // Get current Script Dynamization
-                                Program.DynamizationStr = itemDynamization.GetType().GetProperty("ScriptCode").GetValue(itemDynamization).ToString();
-                                Program.DynamizationTrigger = (Trigger)itemDynamization.GetType().GetProperty("Trigger").GetValue(itemDynamization);
-                                /*
-                                string triggerType = trigger.Type.ToString();
-                                if(triggerType=="Tags")
+                                Regex PropertyName = new Regex(itemDynamization.PropertyName.ToString());
+                                if (!PropertyName.Match(StatementsProperty.Text).Success)
                                 {
-                                   List<string> triggerTags = (List<string>)trigger.Tags;
+                                    continue;
                                 }
-                                if (trigger.CustomDuration != "")
+                                if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Script)
                                 {
+                                    // Get current Script Dynamization
+                                    Program.DynamizationStr = itemDynamization.GetType().GetProperty("ScriptCode").GetValue(itemDynamization).ToString();
+                                    Program.DynamizationTrigger = (Trigger)itemDynamization.GetType().GetProperty("Trigger").GetValue(itemDynamization);
+                                    /*
+                                    string triggerType = trigger.Type.ToString();
+                                    if(triggerType=="Tags")
+                                    {
+                                       List<string> triggerTags = (List<string>)trigger.Tags;
+                                    }
+                                    if (trigger.CustomDuration != "")
+                                    {
 
+                                    }
+                                    */
+                                    Program.DynamizationType = "ScriptCode";
+                                    break;
+                                    // Write changed Script Dynamization
+                                    // itemDynamization.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, itemDynamization, new object[] { s });
                                 }
-                                */
-                                Program.DynamizationType = "ScriptCode";
-                                break;
-                                // Write changed Script Dynamization
-                                // itemDynamization.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, itemDynamization, new object[] { s });
-                            }
-                            if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Tag)
-                            {
-                                // Get current Script Dynamization
-                                Program.DynamizationStr = itemDynamization.GetType().GetProperty("Tag").GetValue(itemDynamization).ToString();
-                                Program.DynamizationStr = Program.DynamizationStr + "-"+itemDynamization.GetType().GetProperty("ReadOnly").GetValue(itemDynamization).ToString();
-                                Program.DynamizationType = "Tag";
-                                break;
-                                // Write changed Script Dynamization
-                                // itemDynamization.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, itemDynamization, new object[] { s });
+                                if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Tag)
+                                {
+                                    // Get current Script Dynamization
+                                    Program.DynamizationStr = itemDynamization.GetType().GetProperty("Tag").GetValue(itemDynamization).ToString();
+                                    Program.DynamizationStr = Program.DynamizationStr + "-" + itemDynamization.GetType().GetProperty("ReadOnly").GetValue(itemDynamization).ToString();
+                                    Program.DynamizationType = "Tag";
+                                    break;
+                                    // Write changed Script Dynamization
+                                    // itemDynamization.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, itemDynamization, new object[] { s });
+                                }
                             }
                         }
                     }
                 }
+                else
+                {
+                    foreach (var screenItem in Program.ItemList)
+                    {
+                        string StatementsPropertyMarchText = StatementsProperty.Text;
+
+                        if (StatementsProperty.Text == "HiddenInput" || StatementsProperty.Text == "AcceptOnDeactivated")
+                        {
+                            StatementsPropertyMarchText = "InputBehavior";
+                            Siemens.Engineering.HmiUnified.UI.Parts.HmiInputBehaviorPart propertiesObject = (Siemens.Engineering.HmiUnified.UI.Parts.HmiInputBehaviorPart)screenItem.GetType().GetProperty("InputBehavior").GetValue(screenItem);
+                            if (propertiesObject.Dynamizations.Count > 0)
+                            {
+                                foreach (var itemDynamization in propertiesObject.Dynamizations)
+                                {
+                                    Regex PropertyName = new Regex(itemDynamization.PropertyName.ToString());
+
+                                    if (!PropertyName.Match(StatementsProperty.Text).Success)
+                                    {
+                                        continue;
+                                    }
+                                    if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Script)
+                                    {
+                                        // Get current Script Dynamization
+                                        Program.DynamizationStr = itemDynamization.GetType().GetProperty("ScriptCode").GetValue(itemDynamization).ToString();
+                                        Program.DynamizationTrigger = (Trigger)itemDynamization.GetType().GetProperty("Trigger").GetValue(itemDynamization);
+                                        Program.DynamizationType = "ScriptCode";
+                                        break;
+                                    }
+                                    if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Tag)
+                                    {
+                                        // Get current Script Dynamization
+                                        Program.DynamizationStr = itemDynamization.GetType().GetProperty("Tag").GetValue(itemDynamization).ToString();
+                                        Program.DynamizationStr = Program.DynamizationStr + "-" + itemDynamization.GetType().GetProperty("ReadOnly").GetValue(itemDynamization).ToString();
+                                        Program.DynamizationType = "Tag";
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        else if(screenItem.Dynamizations.Count > 0)
+                        {
+                            foreach (var itemDynamization in screenItem.Dynamizations)
+                            {
+                                
+                                Regex PropertyName = new Regex(itemDynamization.PropertyName.ToString());
+                                
+                                if (!PropertyName.Match(StatementsPropertyMarchText).Success)
+                                {
+                                    continue;
+                                }
+                                if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Script)
+                                {
+                                    // Get current Script Dynamization
+                                    Program.DynamizationStr = itemDynamization.GetType().GetProperty("ScriptCode").GetValue(itemDynamization).ToString();
+                                    Program.DynamizationTrigger = (Trigger)itemDynamization.GetType().GetProperty("Trigger").GetValue(itemDynamization);
+                                    /*
+                                    string triggerType = trigger.Type.ToString();
+                                    if(triggerType=="Tags")
+                                    {
+                                       List<string> triggerTags = (List<string>)trigger.Tags;
+                                    }
+                                    if (trigger.CustomDuration != "")
+                                    {
+
+                                    }
+                                    */
+                                    Program.DynamizationType = "ScriptCode";
+                                    break;
+                                    // Write changed Script Dynamization
+                                    // itemDynamization.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, itemDynamization, new object[] { s });
+                                }
+                                if (itemDynamization.DynamizationType == Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType.Tag)
+                                {
+                                    // Get current Script Dynamization
+                                    Program.DynamizationStr = itemDynamization.GetType().GetProperty("Tag").GetValue(itemDynamization).ToString();
+                                    Program.DynamizationStr = Program.DynamizationStr + "-" + itemDynamization.GetType().GetProperty("ReadOnly").GetValue(itemDynamization).ToString();
+                                    Program.DynamizationType = "Tag";
+                                    break;
+                                    // Write changed Script Dynamization
+                                    // itemDynamization.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, itemDynamization, new object[] { s });
+                                }
+                            }
+                        }
+                    }
+                }
+                   
                 DynamizationScript dynamizationScriptForm = new DynamizationScript();
                 dynamizationScriptForm.TaskEvent += new TaskDelegate(StatementValueStr);
                 dynamizationScriptForm.ShowDialog();               
@@ -2077,6 +2292,16 @@ namespace ReUnifier
                 Program.DynamizationStr = "";
                 Program.DynamizationType = "";
             }
+        }
+
+        private void tabPage1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void comboBoxProName_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

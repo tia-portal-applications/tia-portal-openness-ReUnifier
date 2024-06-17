@@ -17,6 +17,9 @@ using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 using System.Net;
 using Siemens.Engineering.HmiUnified.UI.Parts;
 using Siemens.Engineering.HmiUnified.UI.Events;
+using Siemens.Engineering.HmiUnified.UI.Enum;
+using Siemens.Engineering.Hmi.RuntimeScripting;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 
 namespace ReUnifier
 {
@@ -25,66 +28,65 @@ namespace ReUnifier
 
         public void InsertTags(string type)//insert a new tag, or logging tag, or AlarmTag. If the setting Information is ont only one item, after insert, it should jump to the update fuction.
         {
-            String newName = Program.SetStatements["Name"];
-            int tagNum = 0;
-            int loggingTagNum = 0;
-            int discreteAlarmTagNum = 0;
-            int analogAlarmTagNum = 0;
-            if (Program.ScreenName == "HmiTags" && Program.HmiSoftware.Tags.Find(newName) == null)
+            if(Program.SetStatements.Count>0)
             {
-                if (System.Windows.Forms.MessageBox.Show(@" Create a new Tag ?", @" Confirm Message", MessageBoxButtons.OKCancel) == DialogResult.OK)
+                String newName = Program.SetStatements["Name"];
+                int tagNum = 0;
+                int loggingTagNum = 0;
+                int discreteAlarmTagNum = 0;
+                int analogAlarmTagNum = 0;
+                if (Program.ScreenName == "HmiTags" )
                 {
-                    Program.HmiSoftware.Tags.Create(newName);
-                    LogAndXmlOP.LogOut("Log", "create a new Tag : " + newName + " \n", 0);
-                    Program.StrShow += "create a new Tag : " + newName + " \n";
-                    tagNum++;
-                    if (Program.SetStatements.Count > 1)
+                    if (Program.HmiSoftware.Tags.Find(newName) == null)
                     {
-                        Program.WhereConditionsStr = "Name &$&= &$&" + newName;
-                        Program.SetStatements.Remove("Name");
-                        HandleHmiTags(type);//jump to the update function
+                        Program.HmiSoftware.Tags.Create(newName);
+                        LogAndXmlOP.LogOut("Log", "create a new Tag : " + newName + " \n", 0);
+                        Program.StrShow += "create a new Tag : " + newName + " \n";
+                        tagNum++;
+                        if (Program.SetStatements.Count > 1)
+                        {
+                            Program.WhereConditionsStr = "Name &$&= &$&" + newName;
+                            Program.SetStatements.Remove("Name");
+                            HandleHmiTags(type);//jump to the update function
+                        }
+                    }
+                    else
+                    {
+                        LogAndXmlOP.LogOut("Log", "Alarming : " + " Tag creation failed, it already exists " + " \n", 0);
+                        Program.StrShow += "Alarming : " + " Tag creation failed, it already exists " + " \n";
                     }
                 }
-                else
+                else if (Program.ScreenName == "HmiLoggingTags")
                 {
-                    LogAndXmlOP.LogOut("Log", "Alarming : " + " Tag creation failed, it already exists " + " \n", 0);
-                    Program.StrShow += "Alarming : " + " Tag creation failed, it already exists " + " \n";
-                }
-            }
-            else if (Program.ScreenName == "HmiLoggingTags")
-            {
-                foreach (var tag in Program.HmiSoftware.Tags)
-                {
-                    foreach (var relevantTag in RecursiveTags(tag, tag.Name))
+                    Conditionstolist();
+                    foreach (var tag in Program.HmiSoftware.Tags)
                     {
-                        if (relevantTag.LoggingTags.Find(newName) == null)//First search whether there is this logtag. If not, create a new one
+                        if (Compare_tag(tag, tag.Name))
                         {
-                            if (System.Windows.Forms.MessageBox.Show(@"create a new LoggingTags?", @"Confirm Message", MessageBoxButtons.OKCancel) == DialogResult.OK)
+                            if (tag.LoggingTags.Find(newName) == null)//First search whether there is this logtag. If not, create a new one
                             {
-                                relevantTag.LoggingTags.Create(newName);//Insert a record variable. The archive file stored in the record variable is not set. Manual is required.
+                                tag.LoggingTags.Create(newName);//Insert a record variable. The archive file stored in the record variable is not set. Manual is required.
                                 LogAndXmlOP.LogOut("Log", "create a new LoggingTag : " + newName + " \n", 0);
                                 Program.StrShow += "create a new LoggingTag : " + newName + " \n";
                                 loggingTagNum++;
                                 if (Program.SetStatements.Count > 1)
                                 {
+                                    Program.WhereConditionsStr = "Name &$&= &$&" + newName;
                                     Program.SetStatements.Remove("Name");
-                                    HandleHmiTags(type);
+                                    HandleHmiLoggingTags(type);
                                 }
                             }
-                        }
-                        else
-                        {
-                            LogAndXmlOP.LogOut("Log", "Alarming : " + " LoggingTag creation failed, it already exists " + " \n", 0);
-                            Program.StrShow = Program.StrShow + "Alarming : " + " LoggingTag creation failed, it already exists " + " \n";
+                            else
+                            {
+                                LogAndXmlOP.LogOut("Log", "Alarming : " + " LoggingTag creation failed, it already exists " + " \n", 0);
+                                Program.StrShow = Program.StrShow + "Alarming : " + " LoggingTag creation failed, it already exists " + " \n";
+                            }
                         }
                     }
                 }
-            }
-            else if (Program.ScreenName == "HmiDiscreteAlarmTags")
-            {
-                if (Program.HmiSoftware.DiscreteAlarms.Find(newName) == null)//First search whether there is this logtag. If not, create a new one
+                else if (Program.ScreenName == "HmiDiscreteAlarmTags")
                 {
-                    if (System.Windows.Forms.MessageBox.Show(@"create a new  DiscreteAlarmTag?", @"Confirm Message", MessageBoxButtons.OKCancel) == DialogResult.OK)
+                    if (Program.HmiSoftware.DiscreteAlarms.Find(newName) == null)//First search whether there is this logtag. If not, create a new one
                     {
                         Program.HmiSoftware.DiscreteAlarms.Create(newName);//Insert a record variable. The archive file stored in the record variable is not set. Manual is required.
                         LogAndXmlOP.LogOut("Log", "create a new  DiscreteAlarmTag : " + newName + " \n", 0);
@@ -94,21 +96,18 @@ namespace ReUnifier
                         {
                             Program.WhereConditionsStr = "Name &$&= &$&" + newName;
                             Program.SetStatements.Remove("Name");
-                            HandleHmiTags(type);
+                            HandleHmiAlarmTags(type);
                         }
+                    }
+                    else
+                    {
+                        LogAndXmlOP.LogOut("Log", "Alarming : " + "  DiscreteAlarmTag creation failed, it already exists " + " \n", 0);
+                        Program.StrShow = Program.StrShow + "Alarming : " + "  DiscreteAlarmTag creation failed, it already exists " + " \n";
                     }
                 }
                 else
                 {
-                    LogAndXmlOP.LogOut("Log", "Alarming : " + "  DiscreteAlarmTag creation failed, it already exists " + " \n", 0);
-                    Program.StrShow = Program.StrShow + "Alarming : " + "  DiscreteAlarmTag creation failed, it already exists " + " \n";
-                }
-            }
-            else
-            {
-                if (Program.HmiSoftware.AnalogAlarms.Find(newName) == null)//First search whether there is this logtag. If not, create a new one
-                {
-                    if (System.Windows.Forms.MessageBox.Show(@"create a new   AnalogAlarmTag?", @"Confirm Message", MessageBoxButtons.OKCancel) == DialogResult.OK)
+                    if (Program.HmiSoftware.AnalogAlarms.Find(newName) == null)//First search whether there is this logtag. If not, create a new one
                     {
                         Program.HmiSoftware.AnalogAlarms.Create(newName);//Insert a record variable. The archive file stored in the record variable is not set. Manual is required.
                         LogAndXmlOP.LogOut("Log", "create a new   AnalogAlarmTag : " + newName + " \n", 0);
@@ -118,40 +117,41 @@ namespace ReUnifier
                         {
                             Program.WhereConditionsStr = "Name &$&= &$&" + newName;
                             Program.SetStatements.Remove("Name");
-                            HandleHmiTags(type);
+                            HandleHmiAlarmTags(type);
                         }
                     }
+                    else
+                    {
+                        LogAndXmlOP.LogOut("Log", "Alarming : " + "   AnalogAlarmTag creation failed, it already exists " + " \n", 0);
+                        Program.StrShow = Program.StrShow + "Alarming : " + "   AnalogAlarmTag creation failed, it already exists " + " \n";
+                    }
+                    analogAlarmTagNum++;
                 }
-                else
+                if (tagNum > 0)
                 {
-                    LogAndXmlOP.LogOut("Log", "Alarming : " + "   AnalogAlarmTag creation failed, it already exists " + " \n", 0);
-                    Program.StrShow = Program.StrShow + "Alarming : " + "   AnalogAlarmTag creation failed, it already exists " + " \n";
+                    LogAndXmlOP.LogOut("Log", "create new Tags Num : " + tagNum + " \n", 0);
+                    Program.StrShow = Program.StrShow + "create new Tags Num : " + tagNum + " \n";
                 }
-                analogAlarmTagNum++;
+                if (loggingTagNum > 0)
+                {
+                    LogAndXmlOP.LogOut("Log", "create new LoggingTags Num : " + loggingTagNum + " \n", 0);
+                    Program.StrShow = Program.StrShow + "create new LoggingTags Num : " + loggingTagNum + " \n";
+                }
+                if (discreteAlarmTagNum > 0)
+                {
+                    LogAndXmlOP.LogOut("Log", "create new DiscreteAlarmTags Num : " + discreteAlarmTagNum + " \n", 0);
+                    Program.StrShow = Program.StrShow + "create new DiscreteAlarmTags Num : " + discreteAlarmTagNum + " \n";
+                }
+                if (discreteAlarmTagNum > 0)
+                {
+                    LogAndXmlOP.LogOut("Log", "create new AnalogAlarmTags Num : " + analogAlarmTagNum + " \n", 0);
+                    Program.StrShow = Program.StrShow + "create new AnalogAlarmTags Num : " + analogAlarmTagNum + " \n";
+                }
             }
-            if (tagNum > 0)
-            {
-                LogAndXmlOP.LogOut("Log", "create new Tags Num : " + tagNum + " \n", 0);
-                Program.StrShow = Program.StrShow + "create new Tags Num : " + tagNum + " \n";
-            }
-            if (loggingTagNum > 0)
-            {
-                LogAndXmlOP.LogOut("Log", "create new LoggingTags Num : " + loggingTagNum + " \n", 0);
-                Program.StrShow = Program.StrShow + "create new LoggingTags Num : " + loggingTagNum + " \n";
-            }
-            if (discreteAlarmTagNum > 0)
-            {
-                LogAndXmlOP.LogOut("Log", "create new DiscreteAlarmTags Num : " + discreteAlarmTagNum + " \n", 0);
-                Program.StrShow = Program.StrShow + "create new DiscreteAlarmTags Num : " + discreteAlarmTagNum + " \n";
-            }
-            if (discreteAlarmTagNum > 0)
-            {
-                LogAndXmlOP.LogOut("Log", "create new AnalogAlarmTags Num : " + analogAlarmTagNum + " \n", 0);
-                Program.StrShow = Program.StrShow + "create new AnalogAlarmTags Num : " + analogAlarmTagNum + " \n";
-            }
+            
         }
        
-        public int HandleHmiTags(string type)// update some properties, only for tags and logging tags.
+        public int HandleHmiTags(string type)// update some properties, only for HmiTags.
         {
             int tagNum = 0;
             int loggingTagNum = 0;
@@ -183,17 +183,7 @@ namespace ReUnifier
                                 LogAndXmlOP.LogOut("Log", "Update the property of the tag : " + relevantTag.Name + " \n", 0);
                                 Program.StrShow = Program.StrShow + "Update the property of the tag : " + relevantTag.Name + " \n";
                                 tagNum++;
-                            }
-                            else if (Program.ScreenName == "HmiLoggingTags")//If it is a logtag，it should though foreach again
-                            {
-                                foreach (var loggingTag in relevantTag.LoggingTags)
-                                {
-                                    SetPropertyRecursive(setStatement.Key, testStr, loggingTag);
-                                    LogAndXmlOP.LogOut("Log", "Update the property of the logging Tag : " + loggingTag.Name + " \n", 0);
-                                    Program.StrShow = Program.StrShow + "Update the property of the logging Tag : " + loggingTag.Name + " \n";
-                                    loggingTagNum++;
-                                }
-                            }
+                            }                           
                         }
                     }
                 }
@@ -211,14 +201,69 @@ namespace ReUnifier
             {
                 LogAndXmlOP.LogOut("Log", "Update the properties in tags : " + tagNum + " \n", 0);
                 Program.StrShow = Program.StrShow + "Update the properties in tags : " + tagNum + " \n";
-            }
-            if (loggingTagNum > 0)
+            }         
+            return 0;
+        }
+
+        public int HandleHmiLoggingTags(string type)//update function, only for logging tags.
+        {           
+            int changeNum = 0;
+            int conditionNum = 0;
+            Conditionstolist();
+            foreach (var tag in Program.HmiSoftware.Tags)
             {
-                LogAndXmlOP.LogOut("Log", "The Num of updated properties in logging tags : " + loggingTagNum + " \n", 0);
-                Program.StrShow = Program.StrShow + "The Num of updated properties in logging tags : " + loggingTagNum + " \n";
+                if(tag.LoggingTags.Count>0)
+                {
+                    foreach (var loggingTag in tag.LoggingTags)
+                    {
+                        if (Compare_Loggingtag(tag, loggingTag))/////////////////compare tag
+                        {
+                            conditionNum++;
+                            if (type == "executed")
+                            {
+                                foreach (var setStatement in Program.SetStatements)
+                                {
+                                    string testStr;
+                                    if (setStatement.Value.Contains("'"))
+                                    {
+                                        testStr = tag.GetType().GetProperty(setStatement.Key).GetValue(tag, null).ToString();
+                                        string replaceStrOld = setStatement.Value.Split('\'')[0];
+                                        string replaceStrNew = setStatement.Value.Split('\'')[1];
+                                        testStr = testStr?.Replace(replaceStrOld, replaceStrNew);
+                                    }
+                                    else
+                                    {
+                                        testStr = setStatement.Value;
+                                    }
+                                    SetPropertyRecursive(setStatement.Key, testStr, loggingTag);
+                                    LogAndXmlOP.LogOut("Log", "Update the property of the LoggingTag : " + tag.Name + "." + loggingTag.Name + " \n", 0);
+                                    Program.StrShow = Program.StrShow + "Update the property of the LoggingTag : " + tag.Name + "." + loggingTag.Name + " \n";
+                                    changeNum++;
+                                }
+                            }
+                        }
+                    }
+                    
+                }
+                
+            }
+            if (type == "condition")
+            {
+                return conditionNum;
+            }
+            if (changeNum == 0)
+            {
+                LogAndXmlOP.LogOut("Log", "Alarming : " + " No changes. Conditions do not match" + " \n", 0);
+                Program.StrShow += "Alarming : " + " No changes. Conditions do not match" + " \n";
+            }
+            else
+            {
+                LogAndXmlOP.LogOut("Log", "The Num of updated properties in LoggingTags: " + changeNum + " \n", 0);
+                Program.StrShow += "The Num of updated properties in LoggingTags: " + changeNum + " \n";
             }
             return 0;
         }
+
         public int HandleHmiAlarmTags(string type)//update function, only for alarm tags.
         {
             dynamic hmiAlarmTag;
@@ -375,72 +420,71 @@ namespace ReUnifier
                     {
                         attrVal = Convert.ChangeType(valueToSet, type);
                     }
-
-                   // attrVal = Convert.ChangeType(valueToSet, type);
-                    // if a numeric type begins with + or -, it should be added to the current value
-                    /*
-                    if (IsNumericType(type) && (valueToSet.ToString().StartsWith("+") || valueToSet.ToString().StartsWith("-")))
-                    {
-                        attrVal = (dynamic)obj.GetAttribute(keyToSet) + (dynamic)attrVal;
-                    }
-                    */
                 }
             }
             try
             {
                 obj.SetAttribute(keyToSet, attrVal);
             }
-            catch { /*Console.WriteLine(ex.Message);*/ }
+            catch(Exception ex) { Console.WriteLine(ex.Message); }
         }
         public int UpdateScreen(string type)//update screen items. include delete option
         {
-            Regex rx = new Regex(Program.ScreenName);
+            Regex rx = new Regex(Program.ScreenName.Trim());
 
             int changeNum = 0;
             int conditionNum = 0;
             Program.ItemList.Clear();
             Conditionstolist();
-            foreach (var screen in Program.GetScreens())
+            
+            if (Program.OptionStr.EndsWith("ScreenProperties") && type == "executed")
             {
-                if (Program.OptionStr.EndsWith("ScreenProperties"))
+                foreach (var screen in Program.conditionScreenList)
                 {
-                    if (Compare_tag(screen, screen.Name))
-                    {
-                        if (type == "executed")
-                        {
-                            changeNum += UpdateScreenOption(null, screen);//only when we execute the option , it should jump to another function.
-                        }
-                        conditionNum++;
-                    }
+                    changeNum += UpdateScreenOption(null, screen);//only when we execute the option , it should jump to another function.
                 }
-                
-                else
-                {                   
-                    if (!rx.Match(screen.Name).Success)
+            }else
+            {
+                Program.conditionScreenList.Clear();
+                foreach (var screen in Program.GetScreens())
+                {
+                    if (Program.OptionStr.EndsWith("ScreenProperties") && type != "executed")
                     {
-                        continue;
-                    }
-                    for (int i = 0; i < screen.ScreenItems.Count; i++)
-                    {
-                        HmiScreenItemBase screenItem = screen.ScreenItems[i];
-
-                        if (Compare_screen(screenItem.Name, screenItem.GetType().Name))
+                        if (Compare_tag(screen, screen.Name))
                         {
-                            if (type == "executed")
-                            {
-                                int newNum = UpdateScreenOption(screenItem, screen);
-                                if (newNum > 0 && Program.OptionStr.StartsWith("DELETE"))
-                                {
-                                    i--;
-                                }
-                                changeNum += newNum;
-                            }
-                            Program.ItemList.Add(screenItem);
                             conditionNum++;
+                            Program.conditionScreenList.Add(screen);
+                        }
+                    }
+                    else
+                    {
+                        if (!rx.Match(screen.Name).Success)
+                        {
+                            continue;
+                        }
+                        for (int i = 0; i < screen.ScreenItems.Count; i++)
+                        {
+                            HmiScreenItemBase screenItem = screen.ScreenItems[i];
+
+                            if (Compare_screen(screenItem.Name, screenItem.GetType().Name))
+                            {
+                                if (type == "executed")
+                                {
+                                    int newNum = UpdateScreenOption(screenItem, screen);
+                                    if (newNum > 0 && Program.OptionStr.StartsWith("DELETE"))
+                                    {
+                                        i--;
+                                    }
+                                    changeNum += newNum;
+                                }
+                                Program.ItemList.Add(screenItem);
+                                conditionNum++;
+                            }
                         }
                     }
                 }
             }
+            
             if (type == "condition")
             {
                 return conditionNum;
@@ -684,34 +728,64 @@ namespace ReUnifier
                         {
                             if(Program.OptionStr.EndsWith("ScreenProperties"))
                             {
-                                foreach (var screen in Program.GetScreens())
+                                bool matchBool = false;
+                                foreach (HmiScreenEventHandler eveHandler in hmiScreen.EventHandlers)
                                 {
-                                    foreach (HmiScreenEventHandler eveHandler in screen.EventHandlers)
-                                    {
-                                        string eveType = eveHandler.GetAttribute("EventType").ToString();
-                                        IEngineeringObject script = eveHandler.GetAttribute("Script") as IEngineeringObject;
-                                        Regex PropertyName = new Regex(eveType);
-                                        if (!PropertyName.Match(dynamizationType).Success)
-                                        {
-                                            continue;
-                                        }
-                                        if (testStr.EndsWith("Event_Delete"))
-                                        {
-                                            script.SetAttribute("ScriptCode", "");
-                                        }
-                                        else
-                                        {
-                                            if(testStr.StartsWith("\n")==false)
-                                            {
-                                                testStr = "\n" + testStr;
-                                            }
-                                            
-                                            script.SetAttribute("ScriptCode", testStr);
-                                        }
-
-                                        break;
-
+                                    string eveType = eveHandler.GetAttribute("EventType").ToString();
+                                    IEngineeringObject script = eveHandler.GetAttribute("Script") as IEngineeringObject;
+                                    if (eveType != dynamizationType.Trim())
+                                    { 
+                                        continue;
                                     }
+                                    if (testStr.EndsWith("Event_Delete"))
+                                    {
+                                        script.SetAttribute("ScriptCode", "");
+                                    }
+                                    else
+                                    {
+                                        if (testStr.StartsWith("\n") == false)
+                                        {
+                                            testStr = "\n" + testStr;
+                                        }
+
+                                        script.SetAttribute("ScriptCode", testStr);
+                                    }
+                                    matchBool = true;
+                                    break;
+
+                                }
+                                if(matchBool==false)
+                                {
+                                    HmiScreenEventHandler screenHandler;
+                                    if (dynamizationType.Trim()=="Tapped")
+                                    {
+                                        screenHandler = hmiScreen.EventHandlers.Create(HmiScreenEventType.Tapped);
+                                    }
+                                    else if(dynamizationType.Trim() == "ContextTapped")
+                                    {
+                                        screenHandler = hmiScreen.EventHandlers.Create(HmiScreenEventType.ContextTapped);
+                                    }
+                                    else if (dynamizationType.Trim() == "Loaded")
+                                    {
+                                        screenHandler = hmiScreen.EventHandlers.Create(HmiScreenEventType.Loaded);
+                                    }
+                                    else if (dynamizationType.Trim() == "Unloaded")
+                                    {
+                                        screenHandler = hmiScreen.EventHandlers.Create(HmiScreenEventType.Unloaded);
+                                    }
+                                    else
+                                    {
+                                        screenHandler = hmiScreen.EventHandlers.Create(HmiScreenEventType.None);
+                                    }
+
+                                    string eveType = screenHandler.GetAttribute("EventType").ToString();
+                                    IEngineeringObject script = screenHandler.GetAttribute("Script") as IEngineeringObject;
+                                    if (testStr.StartsWith("\n") == false)
+                                    {
+                                        testStr = "\n" + testStr;
+                                    }
+                                    script.SetAttribute("ScriptCode", testStr);
+                                    
                                 }
                             }
                             else
@@ -740,10 +814,9 @@ namespace ReUnifier
 
                                     break;
                                 }
-                            }
-                            
+                                
+                            }              
                             loggingStr = "Update the property : " + setStatement.Key + "  from the Screen : " + hmiScreen.Name + " \n";
-
                         }
                         else
                         {
@@ -820,16 +893,36 @@ namespace ReUnifier
                             }                           
                             else 
                             {
+                                string keyStr = setStatement.Key;
+                                string keyParent = setStatement.Key;
+                                HmiInputBehaviorPart propertiesObject=null;
+                                if (keyStr == "HiddenInput" || keyStr == "AcceptOnDeactivated")
+                                {
+                                    keyStr = "InputBehavior." + keyStr;
+                                    keyParent = "InputBehavior";
+                                    propertiesObject = (HmiInputBehaviorPart)screenItem.GetType().GetProperty("InputBehavior").GetValue(screenItem);
+                                }
+
                                 if (testStr == "Dynamization_Delete")
                                 {
                                     foreach (var itemProperties in screenItem.GetType().GetProperties())
                                     {
                                         Regex PropertyName = new Regex(itemProperties.Name.ToString());
-                                        if (!PropertyName.Match(setStatement.Key).Success)
+                                        if (!PropertyName.Match(keyParent).Success)
                                         {
                                             continue;
                                         }
-                                        DynamizationBaseComposition dyns = screenItem.Dynamizations;
+
+                                        DynamizationBaseComposition dyns = null;
+                                        if (keyParent == "InputBehavior")
+                                        {
+                                            dyns = propertiesObject.Dynamizations;
+                                        }
+                                        else
+                                        {
+                                            dyns = screenItem.Dynamizations;
+                                        }  
+                                        
                                         DynamizationBase dynamization = dyns.Find(setStatement.Key);
                                         dynamization.Delete();
                                         break;
@@ -840,12 +933,22 @@ namespace ReUnifier
                                     foreach (var itemProperties in screenItem.GetType().GetProperties())
                                     {
                                         Regex PropertyName = new Regex(itemProperties.Name.ToString());
-                                        if (!PropertyName.Match(setStatement.Key).Success)
+                                        if (!PropertyName.Match(keyParent).Success)
                                         {
                                             continue;
                                         }
                                         testStr = "\n" + testStr;
-                                        DynamizationBaseComposition dyns = screenItem.Dynamizations;
+
+                                        DynamizationBaseComposition dyns = null;
+                                        if (keyParent == "InputBehavior")
+                                        {
+                                            dyns = propertiesObject.Dynamizations;
+                                        }
+                                        else
+                                        {
+                                            dyns = screenItem.Dynamizations;
+                                        }    
+                                        
                                         ScriptDynamization scriptDynamic = dyns.Create<ScriptDynamization>(setStatement.Key);
                                         scriptDynamic.GetType().InvokeMember("ScriptCode", BindingFlags.Instance | BindingFlags.Public | BindingFlags.SetProperty, Type.DefaultBinder, scriptDynamic, new object[] { testStr });
                                         if (triggerType == "Disabled")
@@ -874,7 +977,16 @@ namespace ReUnifier
                                         {
                                             continue;
                                         }
-                                        DynamizationBaseComposition dyns = screenItem.Dynamizations;
+
+                                        DynamizationBaseComposition dyns = null;
+                                        if (keyParent == "InputBehavior")
+                                        {
+                                            dyns = propertiesObject.Dynamizations;
+                                        }
+                                        else
+                                        {
+                                            dyns = screenItem.Dynamizations;
+                                        }
                                         TagDynamization tagDynamic = dyns.Create<TagDynamization>(setStatement.Key);
                                         tagDynamic.Tag = testStr.Split('-')[0].Trim();
                                         tagDynamic.ReadOnly = bool.Parse(testStr.Split('-')[1].Trim());
@@ -883,7 +995,8 @@ namespace ReUnifier
                                 }
                                 else
                                 {
-                                    SetPropertyRecursive(setStatement.Key, testStr, screenItem);
+                                    
+                                    SetPropertyRecursive(keyStr, testStr, screenItem);
                                 }
                                 loggingStr = "Update the property : " + setStatement.Key + " Of the Item : " + screenItem.Name + Program.ScreenItemUpdate + " from the Screen : " + hmiScreen.Name + " \n";                                
                             }
@@ -930,7 +1043,7 @@ namespace ReUnifier
             return tags;
         }
         // gibt alle Geräte mit WinCC Unified in einer Liste zurück
-        public bool IsRelevant(dynamic tag, string fullTagName, List<string> whereConditionsListNew)//only for all kinds tags
+        public bool IsRelevant(dynamic tag, string fullTagName, List<string> whereConditionsListNew)//only for all tags
         {
             bool resultBool = false;
             foreach (var whereCondition in whereConditionsListNew)
@@ -945,13 +1058,30 @@ namespace ReUnifier
                     if (split[1].Trim() == "=")
                     {
                         string rx = split[2].Trim();
-                        string property = split[0].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[0] })[0].ToString();
+                        string property = "";
+                        if (split[0].Trim() == "Process tag")
+                        {
+                            property = fullTagName;
+                        }
+                        else
+                        {
+                            property = split[0].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[0] })[0].ToString();
+                        }
+            
                         resultBool = (rx == property);
                     }
                     else
                     {
                         Regex rx = new Regex(split[2].Trim().Replace(".", "\\."), RegexOptions.Compiled);//^And $are the start and end characters. However, this is not applicable to fuzzy query criteria.
-                        string property = split[0].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[0] })[0].ToString();
+                        string property = "";
+                        if (split[0].Trim() == "Process tag")
+                        {
+                            property = fullTagName;
+                        }
+                        else
+                        {
+                            property = split[0].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[0] })[0].ToString();
+                        }
                         resultBool = rx.Match(property).Success;
                     }
                 }
@@ -961,13 +1091,29 @@ namespace ReUnifier
                     if (split[2].Trim() == "=")
                     {
                         string rx = split[3].Trim();
-                        string property = split[1].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[1] })[0].ToString();
+                        string property = "";
+                        if (split[1].Trim() == "Process tag")
+                        {
+                            property = fullTagName;
+                        }
+                        else
+                        {
+                            property = split[1].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[1] })[0].ToString();
+                        }
                         itemResultBool = (rx == property);
                     }
                     else
                     {
                         Regex rx = new Regex(split[3].Trim().Replace(".", "\\."), RegexOptions.Compiled);//^And $are the start and end characters. However, this is not applicable to fuzzy query criteria.
-                        string property = split[1].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[1] })[1].ToString();
+                        string property = "";
+                        if (split[1].Trim() == "Process tag")
+                        {
+                            property = fullTagName;
+                        }
+                        else
+                        {
+                            property = split[1].Trim() == "Name" ? fullTagName : tag.GetAttributes(new List<string> { split[1] })[0].ToString();
+                        }
                         itemResultBool = rx.Match(property).Success;
                     }
                     if (split[0].Trim() == "And")
@@ -983,7 +1129,93 @@ namespace ReUnifier
             return resultBool;
         }
 
-        public bool isRelevant_screen(string nameStr, string typeStr, List<string> whereConditionsListNew)//only for screen items
+        public bool IsRelevant_loggingtag(dynamic tag, dynamic loggingtag, List<string> whereConditionsListNew)//only for all kinds LoggingTags
+        {
+            bool resultBool = false;
+            foreach (var whereCondition in whereConditionsListNew)
+            {
+                if (whereCondition.Trim().Length == 0)
+                {
+                    continue;
+                }
+                string[] split = whereCondition.Trim().Split(new[] { "&$&" }, StringSplitOptions.None);
+                if (split[0].Trim() != "And" && split[0].Trim() != "Or")
+                {
+                    if (split[1].Trim() == "=")
+                    {
+                        string rx = split[2].Trim();
+                        string property = "";
+                        if (split[0].Trim() == "Process tag")
+                        {
+                            property = tag.Name;
+                        }
+                        else
+                        {
+                            property = split[0].Trim() == "Name" ? loggingtag.Name : loggingtag.GetAttributes(new List<string> { split[0] })[0].ToString();
+                        }
+                        resultBool = (rx == property);
+                    }
+                    else
+                    {
+                        Regex rx = new Regex(split[2].Trim().Replace(".", "\\."), RegexOptions.Compiled);//^And $are the start and end characters. However, this is not applicable to fuzzy query criteria.
+                        string property = "";
+                        if (split[0].Trim() == "Process tag")
+                        {
+                            property = tag.Name;
+                        }
+                        else
+                        {
+                            property = split[0].Trim() == "Name" ? loggingtag.Name : loggingtag.GetAttributes(new List<string> { split[0] })[0].ToString();
+                        }
+                        resultBool = rx.Match(property).Success;
+                    }
+                }
+                else
+                {
+                    bool itemResultBool;
+                    if (split[2].Trim() == "=")
+                    {
+                        string rx = split[3].Trim();
+                        string property = "";
+                        if (split[1].Trim() == "Process tag")
+                        {
+                            property = tag.Name;
+                        }
+                        else
+                        {
+                            property = split[1].Trim() == "Name" ? loggingtag.Name : loggingtag.GetAttributes(new List<string> { split[1] })[0].ToString();
+                        }
+                        
+                        itemResultBool = (rx == property);
+                    }
+                    else
+                    {
+                        Regex rx = new Regex(split[3].Trim().Replace(".", "\\."), RegexOptions.Compiled);//^And $are the start and end characters. However, this is not applicable to fuzzy query criteria.
+                        string property = "";
+                        if (split[1].Trim() == "Process tag")
+                        {
+                            property = tag.Name;
+                        }
+                        else
+                        {
+                            property = split[1].Trim() == "Name" ? loggingtag.Name : loggingtag.GetAttributes(new List<string> { split[1] })[0].ToString();
+                        }
+                        itemResultBool = rx.Match(property).Success;
+                    }
+                    if (split[0].Trim() == "And")
+                    {
+                        resultBool = resultBool && itemResultBool;
+                    }
+                    else
+                    {
+                        resultBool = resultBool || itemResultBool;
+                    }
+                }
+            }
+            return resultBool;
+        }
+
+        public bool isRelevant_screen(string nameStr, string typeStr, List<string> whereConditionsListNew)//only for screen items or screen properties
         {
             bool resultBool = false;
             foreach (var whereCondition in whereConditionsListNew)
@@ -1162,6 +1394,42 @@ namespace ReUnifier
                     whereConditionslistnew.Add(str[1]);
                 }
                 resultItem = IsRelevant(tag, fullTagName, whereConditionslistnew);
+                if (str[0] == "And")
+                {
+                    resultBool = resultBool && resultItem;
+                }
+                else if (str[0] == "Or")
+                {
+                    resultBool = resultBool || resultItem;
+                }
+                else
+                {
+                    resultBool = resultItem;
+                }
+            }
+            return resultBool;
+        }
+
+        public bool Compare_Loggingtag(dynamic tag, dynamic loggingtag)
+        {
+            bool resultBool = false;
+            bool resultItem;
+            foreach (string[] str in Program.WhereConditionsList)
+            {
+                List<string> whereConditionslistnew = new List<string>();
+                if (str[1].Contains("&$& And&$&") || str[1].Contains("&$& Or&$&"))
+                {
+                    string[] split = str[1].Split(new[] { " &$& " }, StringSplitOptions.None);
+                    foreach (string str1 in split)
+                    {
+                        whereConditionslistnew.Add(str1);
+                    }
+                }
+                else
+                {
+                    whereConditionslistnew.Add(str[1]);
+                }
+                resultItem = IsRelevant_loggingtag(tag, loggingtag, whereConditionslistnew);
                 if (str[0] == "And")
                 {
                     resultBool = resultBool && resultItem;

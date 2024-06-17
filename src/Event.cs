@@ -29,12 +29,14 @@ namespace ReUnifier
 
         private void Event_Load(object sender, EventArgs e)
         {
-            this.EventType.Items.Clear();
+            //this.EventType.Items.Clear();
             this.EventType.Text = "";
+            /*
             if (Program.EventList.Count>0)
             {
                 this.EventType.Items.AddRange(Program.EventList.ToArray());
             }
+            */
         }
 
         private void EventType_SelectedIndexChanged(object sender, EventArgs e)
@@ -43,7 +45,7 @@ namespace ReUnifier
             {
                 if(Program.OptionStr.EndsWith("ScreenProperties"))
                 {
-                    foreach (var screen in Program.GetScreens())
+                    foreach (var screen in Program.conditionScreenList)
                     {
                         foreach (HmiScreenEventHandler eveHandler in screen.EventHandlers)
                         {                           

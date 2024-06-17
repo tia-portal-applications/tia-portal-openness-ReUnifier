@@ -14,13 +14,13 @@ Open "ReUnifier.sln" in Visual Studio and simply build the project.
 
 ### Import
 
-![Import project](./src/img/04.png)
+![Import project](./img/04.png)
 
 Select a project from a running TIA Portal instance and click on the "Connect" button.
 
 
 ### Operation
-![Operation](./src/img/03.png)
+![Operation](./img/03.png)
 
 Choose the operation you want to do.
 
@@ -29,7 +29,7 @@ You can choose between updating screen items, screen properties, tags etc to cre
 
 ### Where
 
-![Where](./src/img/02.png)
+![Where](./img/02.png)
 
 Choose the Query parameters.
 
@@ -40,7 +40,7 @@ I.E. use Name Textfeld And Type = HmiTextBox to change every Textbox with String
 
 ### Set
 
-![Set](./src/img/01.png)
+![Set](./img/01.png)
 
 Set properties and values.
 
@@ -56,17 +56,17 @@ Click on the "Execute" button to apply your changes to the TIA Portal project!
 
 ## Usecase "Custom Scaling"
 
-![Operation](./src/img/08.png)
+![Operation](./img/08.png)
 
 To update items in all screens, use the Regular Expression ".".
 
 
-![Where](./src/img/07.png)
+![Where](./img/07.png)
 
 To update all items just use an empty name String.
 
 
-![Set](./src/img/06.png)
+![Set](./img/06.png)
 
 Use the factor X for scaling on the horizontal axis. This factor (1.3 in this example) has to be applied to the properties "Left" and "Width".
 Caution: Use 1,3 on Windows with german locale.
@@ -75,7 +75,7 @@ Use the factor Y for scaling on the vertical axis. This factor (1.12 in this exa
 Caution: Use 1,12 on Windows with german locale.
 
 
-![Set](./src/img/05.png)
+![Set](./img/05.png)
 
 Check the operation you are about to execute.
 

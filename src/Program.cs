@@ -1,9 +1,11 @@
 ﻿using Siemens.Engineering;
 using Siemens.Engineering.HmiUnified;
+using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.UI.Base;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 using Siemens.Engineering.HmiUnified.UI.ScreenGroup;
 using Siemens.Engineering.HmiUnified.UI.Screens;
+using Siemens.Engineering.HW;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,6 +39,7 @@ namespace ReUnifier
         public static List<string> EventList = new List<string>();
         public static string EventTypeName = "";
         public static string EventCodeStr = "";
+        public static List<HmiScreen> conditionScreenList = new List<HmiScreen>();
 
         /// <summary>
         /// Main。
